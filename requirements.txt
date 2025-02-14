@@ -7,3 +7,4 @@ openpyxl>=3.0.9
 xlrd>=2.0.1
 scikit-learn>=1.0.2
 plotly>=5.13.0
+numba>=0.56.4
