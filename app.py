@@ -10,9 +10,13 @@ import matplotlib.pyplot as plt
 from pymoo.util.ref_dirs import get_reference_directions
 import io
 
-# Initialize session state for page navigation
+# Initialize session state for page navigation and results persistence
 if 'current_page' not in st.session_state:
     st.session_state.current_page = 'Home'
+if 'optimization_results' not in st.session_state:
+    st.session_state.optimization_results = None
+if 'optimization_currency' not in st.session_state:
+    st.session_state.optimization_currency = None
 
 def set_page(page_name):
     st.session_state.current_page = page_name
@@ -82,7 +86,11 @@ def run_optimization(df, decision_vars, value_maps, params):
             if res is None:
                 st.error("Optimization failed to produce results")
                 return None
-            return process_results(res, decision_vars, value_maps, params)
+            results = process_results(res, decision_vars, value_maps, params)
+            # Store results in session state
+            st.session_state.optimization_results = results
+            st.session_state.optimization_currency = params['currency']
+            return results
     except Exception as e:
         st.error(f"Optimization error: {str(e)}")
         return None
@@ -100,7 +108,7 @@ def process_results(res, decision_vars, value_maps, params):
     
     F = res.F
     results_df['Carbon Saving'] = -F[:, 0]
-    results_df[f'Cost Saving ({params["currency"]})'] = -F[:, 1]
+    results_df[f'Economic Profitability ({params["currency"]})'] = -F[:, 1]
     results_df['PPD'] = F[:, 2]
     
     return results_df.sort_values('Carbon Saving', ascending=False)
@@ -204,13 +212,13 @@ def show_visualization(results, currency):
         ax = fig_pareto.add_subplot(111, projection='3d')
         
         scatter = ax.scatter(unique_solutions['Carbon Saving'],
-                           unique_solutions[f'Cost Saving ({currency})'],
+                           unique_solutions[f'Economic Profitability ({currency})'],
                            unique_solutions['PPD'],
                            c=unique_solutions['PPD'],
                            cmap='viridis')
         
         ax.set_xlabel('Carbon Saving')
-        ax.set_ylabel(f'Cost Saving ({currency})')
+        ax.set_ylabel(f'Economic Profitability ({currency})')
         ax.set_zlabel('PPD', labelpad=10)
         plt.colorbar(scatter, label='PPD')
         plt.title('Pareto Front of Solutions')
@@ -224,6 +232,7 @@ def show_visualization(results, currency):
         # Add download buttons and additional visualizations
         pareto_buf = io.BytesIO()
         fig_pareto.savefig(pareto_buf, format='png', dpi=300, bbox_inches='tight')
+        pareto_buf.seek(0)  # Important: reset buffer position to beginning
         st.download_button(
             label="Download Pareto Front Plot",
             data=pareto_buf.getvalue(),
@@ -237,9 +246,9 @@ def show_visualization(results, currency):
         fig_space = plt.figure(figsize=(18, 5))
         
         metrics = [
-            ('Carbon Saving', f'Cost Saving ({currency})', 'PPD'),
-            ('Carbon Saving', 'PPD', f'Cost Saving ({currency})'),
-            (f'Cost Saving ({currency})', 'PPD', 'Carbon Saving')
+            ('Carbon Saving', f'Economic Profitability ({currency})', 'PPD'),
+            ('Carbon Saving', 'PPD', f'Economic Profitability ({currency})'),
+            (f'Economic Profitability ({currency})', 'PPD', 'Carbon Saving')
         ]
         
         for i, (x, y, c) in enumerate(metrics):
@@ -256,6 +265,7 @@ def show_visualization(results, currency):
         # Add download buttons
         space_buf = io.BytesIO()
         fig_space.savefig(space_buf, format='png', dpi=300, bbox_inches='tight')
+        space_buf.seek(0)  # Important: reset buffer position to beginning
         st.download_button(
             label="Download Solution Space Plot",
             data=space_buf.getvalue(),
@@ -282,12 +292,12 @@ def show_visualization(results, currency):
         
 # Page-specific layouts
 def home_page():
-    st.title("Net Zero Carbon (NZC) Building Retrofit Optimization APP")
+    st.title("Building Net Zero Carbon (NZC) Retrofit Optimizer")
     
     st.markdown("""
-    Welcome to the NZC Building Retrofit Optimization APP
+    Welcome to the Building Net Zero Carbon (NZC) Retrofit Optimizer
 
-    Retrofitting buildings to Net Zero Carbon (NZC) is an efficient way to lower carbon emissions and prevent climate change. However, it would be challenging to determine the optimal retrofit strategies concerning social, environmental, and economic sustainability in achieving NZC from existing buildings. Therefore, this app supports deciding optimal retrofit strategies to attain NZC buildings, focusing on carbon savings, economic profitability, and occupant dissatisfaction.
+    Retrofitting buildings to Net Zero Carbon (NZC) is an efficient way to lower carbon emissions and prevent climate change. However, it is challenging to select the optimal retrofit strategies to maximize social, environmental, and economic sustainability while retrofitting the buildings to NZC. Therefore, this app supports deciding optimal retrofit strategies to attain NZC buildings, focusing on carbon savings, economic profitability, and occupant satisfaction. 
 
     ### Available Analysis Methods
 
@@ -302,59 +312,24 @@ def home_page():
     ### How to Use
 
     1. Select your desired analysis method from the sidebar
-    2. Upload your data (the app can be tested using the sample data)
+    2. Upload your data (the app can be tested using the sample data from the data selection on the right side of the app)
     3. Configure parameters and run optimization
     4. Analyze results and download reports
 
     ### Detailed User Manual
-
-    **Step 1 – Select the analysis method**
-    * Select the analysis method from the "Navigation" at the top of the left side of the app.
-    * LCA Optimization – Proposed optimized retrofit strategies focusing on the lifecycle performances of the retrofitted building.
-    * Annual Optimization – Proposed optimized retrofit strategies focusing on the yearly performances of the retrofitted building.
-
-    **Step 2 – Insert the basic parameters of the existing building**
-    * Enter the basic parameters of the existing building under the relevant rows representing "Parameters" on the left side of the app.
-    * Energy Consumption Baseline (kWh/m²) – Enter the annual energy consumption of the selected building in kWh/m².
-    * Carbon emissions baseline (kgCO₂) – Enter the annual operational carbon emissions from the selected building in kgCO₂).
-    * PPD Baseline – Enter the average percentage of occupant dissatisfaction within the selected building.
-    * Lifetime (years) – Enter the expected lifetime of the selected building after retrofitting in years.
-    * Energy Cost – Enter the average cost per energy unit.
-    * Area (m²) – Enter the gross floor area of the selected building in m².
-    * Algorithm – This app supports three optimization algorithms namely; (1) non-dominated sorting genetic algorithm II (NSGA II), (2) non-dominated sorting genetic algorithm III (NSGA III), and (3) adaptive grid-based evolutionary algorithm (AGE-MOEA). Users can choose one of these three algorithms.
-
-    **Step 3 – Enter data to the model**
-    * "Data Selection" allows users to select their data or proceed with the sample data.
-    * Select "Upload own data" to upload a data file developed by the users based on the selected building or select "Use Sample Data" to proceed with any of the sample data provided by the developers. 
-    * The data file needs to be an Excel or CSV file.
-    * The first columns of the datasheet should include the variables (different retrofit measures) while the last five columns should be for the "Energy Consumption per area (kWh/m²)", "Carbon emission (kgCO₂)", "PPD", "Embodied Carbon (kgCO₂e)", "Initial Cost" as indicated below.
     """)
 
-    # Display the screenshot with correct file extension
-    st.image("Screenshot.png", caption="Data format example")
-
-    st.markdown("""
-    * There should not be empty cells or cells containing the value "0". Those cells should be filled as "no" in the dataset.
-
-    **Step 4 – Configuration**
-    * After data is selected for the model, users can observe decision variables are displayed at "Select decision variables".
-    * The users can add and remove decision variables from the row displaying variables.
-    * Next, users need to "Map Target Columns." They should map the relevant columns from the uploaded data file to the given descriptions.
-
-    **Step 5 – Data Analysis and Optimization**
-    * After mapping the target columns "Data Analysis" is displayed.
-    * Under "Decision Variable Options", the options under each decision variable are displayed.
-    * "Processed Data Preview" displayed only the first five columns of the data file after processing with carbon saving (Csave) and economic profitability (EP) calculations.
-    * Click "Start Optimization" to proceed with the optimization.
-
-    **Step 6 – Download the optimization results**
-    * The model will take a few minutes to run the optimization. After completing the optimization, users can visualize the
-    * Optimization Results
-    * Pareto Front
-    * Solution Space Analysis
-    * Users can download the results of optimization and figures of Pareto front and space solutions using "Download Pareto Front Plot", "Download Solution Space Plot", and "Download Results CSV".
-    """)
-
+    # Add download button for detailed manual
+    try:
+        with open("Detailed User Manual.pdf", "rb") as file:
+            st.download_button(
+                label="Download Detailed User Manual",
+                data=file,
+                file_name="Detailed User Manual.pdf",
+                mime="application/pdf"
+            )
+    except Exception as e:
+        st.error(f"Error loading user manual file: {str(e)}")
     
 def optimization_page(optimization_type):
     title = "🔄 Life Cycle Analysis (LCA) Optimization" if optimization_type == "LCA" else "📅 Annual-based Optimization"
@@ -406,12 +381,12 @@ def optimization_page(optimization_type):
             value=111.4
         ),
         'C_BASE': st.sidebar.number_input(
-            "Carbon Baseline (kgCO₂)" if optimization_type == "Annual" else "Carbon Baseline (kgCO₂)", 
+            "Carbon emissions baseline (kgCO₂)" if optimization_type == "Annual" else "Carbon emissions baseline (kgCO₂)", 
             value=1384.5
         ),
-        'PPD_BASE': st.sidebar.number_input("PPD Baseline", value=14.68),
-        'LT': st.sidebar.number_input("Life Time (years)", value=30),
-        'EC': st.sidebar.number_input(f"Energy Cost ({currency})", value=0.918),
+        'PPD_BASE': st.sidebar.number_input("Predicted Percentage of Dissatisfaction (PPD) Baseline", value=14.68),
+        'LT': st.sidebar.number_input("Lifetime (years)", value=30),
+        'EC': st.sidebar.number_input(f"Energy Cost per 1kWh ({currency})", value=0.918),
         'A': st.sidebar.number_input("Area (m²)", value=23.94),
         'algorithm': st.sidebar.selectbox("Algorithm", ["NSGA-II", "NSGA-III", "AGE-MOEA"]),
         'currency': currency,
@@ -450,6 +425,9 @@ def optimization_page(optimization_type):
     if st.button("Start Optimization"):
         results = run_optimization(processed_df, decision_vars, value_maps, params)
         show_visualization(results, currency)
+    # Display previous results if they exist (even after button clicks)
+    elif st.session_state.optimization_results is not None:
+        show_visualization(st.session_state.optimization_results, st.session_state.optimization_currency)
 
 def main():
     st.set_page_config(page_title="Building Retrofit Optimizer", layout="wide")
@@ -460,6 +438,13 @@ def main():
         "Select Analysis Method",
         ["Home", "LCA Optimization", "Annual Optimization"]
     )
+    
+    # Clear results when changing pages
+    if ('current_page' in st.session_state and 
+        page != st.session_state.current_page):
+        st.session_state.optimization_results = None
+        st.session_state.optimization_currency = None
+        st.session_state.current_page = page
     
     # Display selected page
     if page == "Home":
