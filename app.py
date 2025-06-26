@@ -297,8 +297,7 @@ def home_page():
     st.markdown("""
     Welcome to the Building Net Zero Carbon (NZC) Retrofit Optimizer
 
-    Retrofitting buildings to Net Zero Carbon (NZC) is an efficient way to lower carbon emissions and prevent climate change. However, it is challenging to select the optimal retrofit strategies to maximize social, environmental, and economic sustainability while retrofitting the buildings to NZC. Therefore, this app supports deciding optimal retrofit strategies to attain NZC buildings, focusing on carbon savings, economic profitability, and occupant satisfaction. 
-
+    Retrofitting buildings to Net Zero Carbon (NZC) is an effective way to lower carbon emissions and prevent climate change. However, it is challenging to select optimal retrofit strategies to maximize social, environmental, and economic sustainability while retrofitting buildings to NZC. Therefore, this app supports deciding optimal retrofit strategies to attain NZC buildings, focusing on carbon savings, economic profitability, and occupant satisfaction.
     ### Available Analysis Methods
 
     1. **Life Cycle Analysis (LCA) based Optimization**
